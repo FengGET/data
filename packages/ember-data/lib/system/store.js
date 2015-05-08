@@ -26,6 +26,12 @@ import {
 } from "ember-data/system/store/common";
 
 import {
+  convertResourceObject,
+  normalizeResponseHelper,
+  pushPayload
+} from "ember-data/system/store/serializer-response";
+
+import {
   serializerForAdapter
 } from "ember-data/system/store/serializers";
 
@@ -1569,7 +1575,12 @@ Store = Service.extend({
       updated.
   */
   push: function(modelName, data) {
-    Ember.assert("Expected an object as `data` in a call to `push` for " + modelName + " , but was " + data, Ember.typeOf(data) === 'object');
+
+    if (Ember.typeOf(modelName) === 'object' && Ember.typeOf(data) === 'undefined') {
+      return pushPayload(this, data);
+    }
+
+    Ember.assert("Expected an object as `data` in a call to `push` for " + modelName + " , but was " + Ember.typeOf(data), Ember.typeOf(data) === 'object');
     Ember.assert("You must include an `id` for " + modelName + " in an object passed to `push`", data.id != null && data.id !== '');
 
     var type = this.modelFor(modelName);
@@ -2038,13 +2049,13 @@ function _commit(adapter, store, operation, snapshot) {
   promise = _guard(promise, _bind(_objectIsAlive, record));
 
   return promise.then(function(adapterPayload) {
-    var payload;
-
     store._adapterRun(function() {
+      var payload, data;
       if (adapterPayload) {
-        payload = serializer.extract(store, type, adapterPayload, get(snapshot, 'id'), operation);
+        payload = normalizeResponseHelper(serializer, store, type, adapterPayload, get(snapshot, 'id'), operation);
+        data = convertResourceObject(payload.data);
       }
-      store.didSaveRecord(record, payload);
+      store.didSaveRecord(record, data);
     });
 
     return record;
